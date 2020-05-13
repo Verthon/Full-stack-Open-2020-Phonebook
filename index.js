@@ -54,6 +54,7 @@ app.use(
   )
 );
 app.use(cors());
+app.use(express.static('build'))
 morganBody(app, { noColors: true });
 
 app.get("/", (req, res) => {
