@@ -53,11 +53,18 @@ app.use(
     }
   )
 );
-app.use(cors())
+app.use(cors());
 morganBody(app, { noColors: true });
 
-app.get("/api", (req, res) => {
-  res.json({ message: "KEK" });
+app.get("/", (req, res) => {
+  const welcome = "<h1>Welcome, available routes: </h1>";
+  const list = `<ul>
+    <pre>GET /api/persons</pre>
+    <pre>GET /api/persons/:id</pre>
+    <pre>POST /api/persons</pre>
+    <pre>DELETE /api/persons/:id</pre>
+  </ul>`;
+  res.send(`${welcome} ${list}`);
 });
 
 app.get(`${baseUrl}/persons`, (req, res) => {
@@ -113,7 +120,7 @@ app.post(`${baseUrl}/persons`, (req, res) => {
   res.json(person);
 });
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
