@@ -1,41 +1,31 @@
 const express = require("express");
 const morgan = require("morgan");
 const morganBody = require("morgan-body");
+const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
 const baseUrl = "/api";
 
-let persons = [
-  {
-    name: "Arto Hellas",
-    number: "040-123456",
-    id: 1,
-  },
-  {
-    name: "Ada Lovelace",
-    number: "39-44-5323523",
-    id: 2,
-  },
-  {
-    name: "Dan Abramov",
-    number: "12-43-234345",
-    id: 3,
-  },
-  {
-    name: "Mary Poppendieck",
-    number: "39-23-6423122",
-    id: 4,
-  },
-  {
-    name: "Anton Abramov",
-    number: "39-23-6423122",
-    id: 5,
-  },
-];
+const Person = require("./models/person");
+const persons = [];
 
-const generateId = (min) => {
-  return Math.random() * (10000 - min) + min;
-};
+// if (process.argv.length < 3) {
+//   console.log("give password as argument");
+//   process.exit(1);
+// }
+
+const password = process.argv[2];
+
+const url = `mongodb+srv://fullstack:${password}@cluster0-dxg9g.mongodb.net/persons?retryWrites=true&w=majority`;
+
+mongoose
+  .connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then((result) => {
+    console.log("connected to MongoDB");
+  })
+  .catch((error) => {
+    console.log("error in connect", error);
+  });
 
 const isNameUnique = (name, persons) => {
   const query = persons.find((person) => person.name === name);
@@ -54,8 +44,22 @@ app.use(
   )
 );
 app.use(cors());
-app.use(express.static('build'))
+app.use(express.static("build"));
 morganBody(app, { noColors: true });
+
+const errorHandler = (error, request, response, next) => {
+  console.error(error.message);
+
+  if (error.name === "CastError") {
+    return response.status(400).send({ error: "malformatted id" });
+  } else if (error.name === "ValidationError") {
+    return response.status(400).json({ error: error.message });
+  }
+
+  next(error);
+};
+
+app.use(errorHandler);
 
 app.get("/", (req, res) => {
   const welcome = "<h1>Welcome, available routes: </h1>";
@@ -68,8 +72,13 @@ app.get("/", (req, res) => {
   res.send(`${welcome} ${list}`);
 });
 
-app.get(`${baseUrl}/persons`, (req, res) => {
-  res.json(persons);
+app.get(`${baseUrl}/persons`, (req, res, next) => {
+  const persons = [];
+  Person.find({})
+    .then((notes) => {
+      res.json(notes.map((note) => note.toJSON()));
+    })
+    .catch((error) => next(error));
 });
 
 app.get(`${baseUrl}/info`, (req, res) => {
@@ -80,45 +89,57 @@ app.get(`${baseUrl}/info`, (req, res) => {
 });
 
 app.get(`${baseUrl}/persons/:id`, (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find((person) => person.id === id);
-  if (person) {
-    res.json(person);
-  } else {
-    res.status(404).end();
-  }
+  Person.findById(req.params.id)
+    .then((person) => {
+      if (person) {
+        res.json(person.toJSON());
+      } else {
+        response.status(404).end();
+      }
+    })
+    .catch((error) => next(error));
 });
 
-app.delete(`${baseUrl}/persons/:id`, (req, res) => {
-  const id = Number(req.params.id);
-  persons = persons.filter((person) => person.id !== id);
-
-  res.status(204).end();
+app.delete(`${baseUrl}/persons/:id`, (req, res, next) => {
+  const id = req.params.id;
+  Person.findByIdAndRemove(id)
+    .then((result) => {
+      res.status(204).end();
+    })
+    .catch((error) => next(error));
 });
 
 app.post(`${baseUrl}/persons`, (req, res) => {
-  const id = generateId(persons.length);
   const body = req.body;
-
   if (!body.name || !body.number) {
     return res.status(400).json({
       error: "name and number are required",
     });
   }
 
-  const person = {
-    name: body.name,
-    number: body.number,
-    id: id,
-  };
+  const person = new Person({
+    name: req.body.name,
+    number: req.body.number,
+  });
 
   if (!isNameUnique(person.name, persons)) {
     return res.status(403).json({ error: "name must be unique" });
   }
 
-  persons = [...persons, person];
+  if (process.argv.length === 5) {
+    const person = new Person({
+      name: process.argv[3],
+      number: process.argv[4],
+    });
+  }
 
-  res.json(person);
+  person.save().then((savedPerson) => {
+    console.log(
+      `added ${savedPerson.name} number ${savedPerson.number} to phonebook`
+    );
+    res.json(savedPerson.toJSON());
+    //mongoose.connection.close();
+  });
 });
 
 const PORT = process.env.PORT || 3001;
