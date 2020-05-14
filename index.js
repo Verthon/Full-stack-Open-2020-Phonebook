@@ -5,6 +5,7 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const app = express();
 const baseUrl = "/api";
+require('dotenv').config()
 
 const Person = require("./models/person");
 const persons = [];
@@ -16,7 +17,8 @@ const persons = [];
 
 const password = process.argv[2];
 
-const url = `mongodb+srv://fullstack:${password}@cluster0-dxg9g.mongodb.net/persons?retryWrites=true&w=majority`;
+const url = process.env.MONGODB_URI;
+console.log('connecting to', url)
 
 mongoose
   .connect(url, { useNewUrlParser: true, useUnifiedTopology: true })
@@ -73,7 +75,6 @@ app.get("/", (req, res) => {
 });
 
 app.get(`${baseUrl}/persons`, (req, res, next) => {
-  const persons = [];
   Person.find({})
     .then((notes) => {
       res.json(notes.map((note) => note.toJSON()));
